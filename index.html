@@ -1,0 +1,104 @@
+document.getElementById("prodLink").href = bygmaSearchUrl;
+// 4. Gem/opdater i hukommelsen. Hvis varen findes i forvejen, lægges 1 til antallet.
+if (historyObjects[decodedText]) {
+historyObjects[decodedText] += 1;
+} else {
+historyObjects[decodedText] = 1;
+}
+saveToStorage();
+renderHistory();
+// Gør klar igen efter 2,5 sekunder
+setTimeout(() => {
+isScanningBlock = false;
+document.getElementById("status").innerText = "Klar til næste scanning...";
+}, 2500);
+}
+function saveToStorage() {
+localStorage.setItem('bygma_objects', JSON.stringify(historyObjects));
+}
+function changeCount(ean, amount) {
+if (historyObjects[ean]) {
+historyObjects[ean] += amount;
+if (historyObjects[ean] <= 0) {
+deleteItem(ean);
+return;
+}
+saveToStorage();
+renderHistory();
+}
+}
+function deleteItem(ean) {
+delete historyObjects[ean];
+saveToStorage();
+renderHistory();
+}
+function clearAllHistory() {
+if (confirm("Vil du slette hele din materialeliste?")) {
+historyObjects = {};
+saveToStorage();
+renderHistory();
+document.getElementById("resultCard").style.display = "none";
+}
+}
+// Eksporterer listen og åbner iPhones indbyggede SMS eller Mail app
+function shareList(type) {
+const keys = Object.keys(historyObjects);
+if (keys.length === 0) {
+alert("Din liste er tom. Scan nogle varer først!");
+return;
+}
+let textContent = "Bygma Materialeliste:\n";
+keys.forEach(ean => {
+textContent += - Antal: ${historyObjects[ean]} stk. (EAN: ${ean}) - https://bygma.dk{ean}\n;
+});
+if (type === 'sms') {
+window.location.href = sms:?&body=${encodeURIComponent(textContent)};
+} else if (type === 'email') {
+window.location.href = mailto:?subject=Bygma%20Materialeliste&body=${encodeURIComponent(textContent)};
+}
+}
+function renderHistory() {
+const container = document.getElementById("historyContainer");
+container.innerHTML = "";
+const keys = Object.keys(historyObjects).reverse(); // Vis nyeste øverst
+if (keys.length === 0) {
+container.innerHTML = <p style="text-align:center; color:var(--text-muted); font-size:0.9rem; margin-top:10px;">Listen er tom</p>;
+return;
+}
+keys.forEach((ean) => {
+const url = https://bygma.dk{ean};
+const count = historyObjects[ean];
+const item = document.createElement("div");
+item.className = "history-item";
+item.innerHTML = <div class="history-info"> <span style="font-weight:700; font-size: 1rem;">Vare</span> <span class="history-ean">${ean}</span> </div> <div class="history-actions"> <div class="counter-group"> <button class="btn-counter" onclick="changeCount('${ean}', -1)">-</button> <span class="counter-val">${count}</span> <button class="btn-counter" onclick="changeCount('${ean}', 1)">+</button> </div> <a href="${url}" target="_blank" class="history-link">Åbn</a> <button class="btn-delete-item" onclick="deleteItem('${ean}')">✕</button> </div>;
+container.appendChild(item);
+});
+}
+function startScanner() {
+html5QrcodeScanner = new Html5Qrcode("reader");
+html5QrcodeScanner.start(
+{ facingMode: "environment" },
+{
+fps: 25,
+qrbox: function(width, height) {
+return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.45) }
+}
+},
+onScanSuccess
+).catch(err => {
+document.getElementById("status").innerText = "Kamerafejl. Tillad kameradgang i Safari.";
+});
+}
+function restartScanner() {
+if (html5QrcodeScanner) {
+html5QrcodeScanner.stop().then(() => {
+startScanner();
+}).catch(() => startScanner());
+} else {
+startScanner();
+}
+}
+window.addEventListener("DOMContentLoaded", () => {
+startScanner();
+renderHistory();
+});
